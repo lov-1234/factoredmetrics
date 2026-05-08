@@ -47,22 +47,30 @@ For development, clone the repository:
 ```bash
 git clone <repository-url>
 cd factoredmetrics
+pip install -r requirements.txt
 ```
 
 ## Usage
 
-Usage examples will be added as metric implementations become available.
-
-The intended API will likely follow a simple pattern:
+The current MIG implementation exposes lower-level functions for estimating the MI matrix from diagonal-Gaussian encoder outputs and then computing the MIG score:
 
 ```python
-from factoredmetrics.mig import mig
+from mig.mig import compute_mig_from_mi_matrix, estimate_mi_matrix_density
 
-score = mig(latents, factors)
+mi_matrix, entropy_zj, first_terms = estimate_mi_matrix_density(
+    z=samples_from_q_z_given_x,
+    mean=posterior_mean,
+    logvar=posterior_logvar,
+    factors=ground_truth_factors,
+)
+score, score_per_factor, factor_entropies = compute_mig_from_mi_matrix(
+    mi_matrix,
+    ground_truth_factors,
+)
 print(score)
 ```
 
-The exact API may change while the project is being developed.
+Here `z`, `mean`, and `logvar` have shape `(N, D)`, and `factors` has shape `(N, K)`. The factors are expected to be discrete labels or already-discretized values. The exact public API may change while the project is being developed.
 
 ## Metrics
 
@@ -82,6 +90,8 @@ MIG = (1 / K) * sum_k [ (I(z_{j_k^(1)}; v_k) - I(z_{j_k^(2)}; v_k)) / H(v_k) ]
 ```
 
 Higher MIG values generally indicate stronger disentanglement because the most informative latent dimension for each factor is separated from the second-most informative one.
+
+The implementation in `mig/mig.py` estimates `I(z_j; v_k)` using the density-based aggregated-posterior estimator described in the beta-TCVAE paper. It builds `log q(z_i | x_n)` for all sample/component pairs, so the current implementation has `O(N^2D)` memory use. For realistic datasets, MIG needs chunking or batching before it is practical to run.
 
 MIG was introduced by Chen et al. in [Isolating Sources of Disentanglement in Variational Autoencoders](https://papers.nips.cc/paper/7527-isolating-sources-of-disentanglement-in-variational-autoencoders), NeurIPS 2018.
 
